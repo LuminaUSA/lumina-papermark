@@ -2,6 +2,7 @@ import { useRouter } from "next/router";
 
 import React from "react";
 
+import { DataroomCardLayout } from "@prisma/client";
 import { Download, MoreVerticalIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -45,6 +46,7 @@ type DocumentsCardProps = {
   isProcessing?: boolean;
   dataroomIndexEnabled?: boolean;
   showLastUpdated?: boolean;
+  layout?: DataroomCardLayout;
 };
 
 export default function DocumentCard({
@@ -56,6 +58,7 @@ export default function DocumentCard({
   isProcessing = false,
   dataroomIndexEnabled,
   showLastUpdated = true,
+  layout = "LIST",
 }: DocumentsCardProps) {
   const { theme, systemTheme } = useTheme();
   const { palette } = useViewerSurfaceTheme();
@@ -184,13 +187,19 @@ export default function DocumentCard({
   return (
     <div
       className={cn(
-        "group/row relative flex items-center justify-between rounded-lg border p-3 transition-all sm:p-4",
+        "group/row relative flex border transition-all",
         "bg-[var(--viewer-panel-bg)] hover:bg-[var(--viewer-panel-bg-hover)]",
         "border-[var(--viewer-panel-border)] hover:border-[var(--viewer-panel-border-hover)]",
+        layout === "GRID"
+          ? "h-full flex-col items-stretch justify-between gap-3 p-4 sm:p-5"
+          : layout === "COMPACT"
+            ? "items-center justify-between p-2 sm:p-2.5"
+            : "items-center justify-between p-3 sm:p-4",
         isProcessing && "cursor-not-allowed opacity-60",
       )}
       style={
         {
+          borderRadius: "var(--viewer-radius, 0.5rem)",
           "--viewer-panel-bg": palette.panelBgColor,
           "--viewer-panel-bg-hover": palette.panelHoverBgColor,
           "--viewer-panel-border": palette.panelBorderColor,

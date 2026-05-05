@@ -122,6 +122,28 @@ export default function DataroomNav({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [conversationsEnabled, showConversations]);
 
+  const logoPosition = brand?.logoPosition ?? "TOP_LEFT";
+  const secondaryLogo = brand?.secondaryLogo ?? null;
+  const showNavCta =
+    !brand?.sidebarEnabled && !!brand?.ctaLabel && !!brand?.ctaUrl;
+
+  const renderPrimaryLogo = () =>
+    brand && brand.logo ? (
+      <img
+        className="h-16 w-36 object-contain"
+        src={brand.logo}
+        alt="Logo"
+      />
+    ) : (
+      <Link
+        href={`https://www.papermark.com?utm_campaign=navbar&utm_medium=navbar&utm_source=papermark-${linkId}`}
+        target="_blank"
+        className="text-2xl font-bold tracking-tighter text-white"
+      >
+        Papermark
+      </Link>
+    );
+
   return (
     <nav
       className="bg-black"
@@ -131,24 +153,25 @@ export default function DataroomNav({
     >
       <div className="mx-auto px-2 sm:px-6 lg:px-8">
         <div className="relative flex h-16 items-center justify-between">
-          <div className="flex flex-1 items-center justify-start">
+          <div
+            className={
+              logoPosition === "TOP_CENTER"
+                ? "flex flex-1 items-center justify-center"
+                : "flex flex-1 items-center justify-start"
+            }
+          >
             <div className="relative flex h-16 w-36 flex-shrink-0 items-center">
-              {brand && brand.logo ? (
+              {renderPrimaryLogo()}
+            </div>
+            {logoPosition === "SPLIT" && secondaryLogo && (
+              <div className="ml-auto flex h-16 w-36 flex-shrink-0 items-center justify-end">
                 <img
                   className="h-16 w-36 object-contain"
-                  src={brand.logo}
-                  alt="Logo"
+                  src={secondaryLogo}
+                  alt="Secondary logo"
                 />
-              ) : (
-                <Link
-                  href={`https://www.papermark.com?utm_campaign=navbar&utm_medium=navbar&utm_source=papermark-${linkId}`}
-                  target="_blank"
-                  className="text-2xl font-bold tracking-tighter text-white"
-                >
-                  Papermark
-                </Link>
-              )}
-            </div>
+              </div>
+            )}
           </div>
           <div className="absolute inset-y-0 right-0 flex items-center space-x-4 pr-2 sm:static sm:inset-auto sm:ml-6 sm:pr-0">
             {isTeamMember ? (
@@ -171,6 +194,16 @@ export default function DataroomNav({
                 </Tooltip>
               </TooltipProvider>
             ) : null}
+            {showNavCta && (
+              <a
+                href={brand!.ctaUrl!}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-black transition-colors hover:bg-gray-100"
+              >
+                {brand!.ctaLabel}
+              </a>
+            )}
             {conversationsEnabled && (
               <Button onClick={() => setShowConversations(!showConversations)}>
                 View FAQ

@@ -3,6 +3,11 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 
 import { useTeam } from "@/context/team-context";
+import {
+  DataroomCardLayout,
+  DataroomLogoPosition,
+  DataroomRoundness,
+} from "@prisma/client";
 import { Check, CircleHelpIcon, UploadIcon } from "lucide-react";
 import { HexColorInput, HexColorPicker } from "react-colorful";
 import sanitizeHtml from "sanitize-html";
@@ -18,12 +23,15 @@ import AppLayout from "@/components/layouts/app";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { BadgeTooltip } from "@/components/ui/tooltip";
@@ -44,6 +52,10 @@ export default function DataroomBrandPage() {
   const [applyAccentColorToDataroomView, setApplyAccentColorToDataroomView] =
     useState<boolean>(false);
   const [logo, setLogo] = useState<string | null>(null);
+  const [secondaryLogo, setSecondaryLogo] = useState<string | null>(null);
+  const [secondaryLogoBlobUrl, setSecondaryLogoBlobUrl] = useState<
+    string | null
+  >(null);
   const [banner, setBanner] = useState<string | null>(null);
   const [originalBanner, setOriginalBanner] = useState<string | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
@@ -51,6 +63,16 @@ export default function DataroomBrandPage() {
   const [welcomeMessage, setWelcomeMessage] = useState<string>(
     "Your action is requested to continue",
   );
+
+  // Layout customization state
+  const [logoPosition, setLogoPosition] =
+    useState<DataroomLogoPosition>("TOP_LEFT");
+  const [cardLayout, setCardLayout] = useState<DataroomCardLayout>("LIST");
+  const [roundness, setRoundness] = useState<DataroomRoundness>("MEDIUM");
+  const [sidebarEnabled, setSidebarEnabled] = useState<boolean>(false);
+  const [sidebarContent, setSidebarContent] = useState<string>("");
+  const [ctaLabel, setCtaLabel] = useState<string>("");
+  const [ctaUrl, setCtaUrl] = useState<string>("");
   const [debouncedBrandColor] = useDebounce(brandColor, 300);
   const [debouncedAccentColor] = useDebounce(accentColor, 300);
   const [debouncedWelcomeMessage] = useDebounce(welcomeMessage, 500);
@@ -60,6 +82,58 @@ export default function DataroomBrandPage() {
   const [welcomeMessageError, setWelcomeMessageError] = useState<string | null>(
     null,
   );
+
+  // Auto-fill from website (Brandfetch)
+  const [autoFillUrl, setAutoFillUrl] = useState<string>("");
+  const [autoFillLoading, setAutoFillLoading] = useState<boolean>(false);
+
+  const handleAutoFill = async () => {
+    if (!autoFillUrl.trim()) return;
+    setAutoFillLoading(true);
+    try {
+      const res = await fetch("/api/branding/auto-fill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: autoFillUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Could not load brand");
+        return;
+      }
+      let applied = 0;
+      if (data.logo) {
+        setLogo(data.logo);
+        setBlobUrl(null);
+        applied++;
+      }
+      if (data.banner) {
+        setBanner(data.banner);
+        setOriginalBanner(data.banner);
+        setBannerBlobUrl(null);
+        applied++;
+      }
+      if (data.brandColor) {
+        setBrandColor(data.brandColor);
+        applied++;
+      }
+      if (data.accentColor) {
+        setAccentColor(data.accentColor);
+        applied++;
+      }
+      if (applied === 0) {
+        toast.warning("No brand data found for that website");
+      } else {
+        toast.success(
+          `Loaded ${data.name ?? data.domain}. Review and click Save changes.`,
+        );
+      }
+    } catch (err) {
+      toast.error("Lookup failed");
+    } finally {
+      setAutoFillLoading(false);
+    }
+  };
 
   // Welcome message validation
   const MAX_WELCOME_MESSAGE_LENGTH = 80; // Roughly 2 lines of text
@@ -112,6 +186,27 @@ export default function DataroomBrandPage() {
     [setLogo],
   );
 
+  const onChangeSecondaryLogo = useCallback((e: any) => {
+    setFileError(null);
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size / 1024 / 1024 > 2) {
+        setFileError("File size too big (max 2MB)");
+      } else if (file.type !== "image/png" && file.type !== "image/jpeg") {
+        setFileError("File type not supported (.png or .jpg only)");
+      } else {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const dataUrl = e.target?.result as string;
+          setSecondaryLogo(dataUrl);
+          const blob = convertDataUrlToFile({ dataUrl });
+          setSecondaryLogoBlobUrl(URL.createObjectURL(blob));
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  }, []);
+
   const onChangeBanner = useCallback(
     (e: any) => {
       setFileError(null);
@@ -155,6 +250,7 @@ export default function DataroomBrandPage() {
           false,
       );
       setLogo(dataroomBrand?.logo || globalBrand?.logo || null);
+      setSecondaryLogo(dataroomBrand?.secondaryLogo ?? null);
       const bannerValue = dataroomBrand?.banner || globalBrand?.banner || null;
       setBanner(bannerValue);
       setOriginalBanner(bannerValue);
@@ -166,6 +262,15 @@ export default function DataroomBrandPage() {
       // Validate existing message
       const error = validateWelcomeMessage(message);
       setWelcomeMessageError(error);
+
+      // Layout fields
+      setLogoPosition(dataroomBrand?.logoPosition ?? "TOP_LEFT");
+      setCardLayout(dataroomBrand?.cardLayout ?? "LIST");
+      setRoundness(dataroomBrand?.roundness ?? "MEDIUM");
+      setSidebarEnabled(dataroomBrand?.sidebarEnabled ?? false);
+      setSidebarContent(dataroomBrand?.sidebarContent ?? "");
+      setCtaLabel(dataroomBrand?.ctaLabel ?? "");
+      setCtaUrl(dataroomBrand?.ctaUrl ?? "");
     }
   }, [dataroomBrand, globalBrand]);
 
@@ -203,6 +308,14 @@ export default function DataroomBrandPage() {
       setLogo(blobUrl);
     }
 
+    let secondaryLogoUrl: string | null =
+      secondaryLogo && secondaryLogo.startsWith("data:") ? null : secondaryLogo;
+    if (secondaryLogo && secondaryLogo.startsWith("data:")) {
+      const blob = convertDataUrlToFile({ dataUrl: secondaryLogo });
+      secondaryLogoUrl = await uploadImage(blob);
+      setSecondaryLogo(secondaryLogoUrl);
+    }
+
     let bannerBlobUrl: string | null =
       banner && banner.startsWith("data:") ? null : banner;
     // Don't upload if banner is set to hide
@@ -224,7 +337,15 @@ export default function DataroomBrandPage() {
       accentColor: accentColor,
       applyAccentColorToDataroomView,
       logo: blobUrl,
+      secondaryLogo: secondaryLogoUrl,
       banner: bannerBlobUrl,
+      logoPosition,
+      cardLayout,
+      roundness,
+      sidebarEnabled,
+      sidebarContent: sidebarContent.trim() || null,
+      ctaLabel: ctaLabel.trim() || null,
+      ctaUrl: ctaUrl.trim() || null,
     };
 
     const res = await fetch(
@@ -262,16 +383,53 @@ export default function DataroomBrandPage() {
     );
     if (res.ok) {
       setLogo(null);
+      setSecondaryLogo(null);
       setBanner(DEFAULT_BANNER_IMAGE);
       setOriginalBanner(DEFAULT_BANNER_IMAGE);
       setBrandColor("#000000");
       setApplyAccentColorToDataroomView(
         (globalBrand as any)?.applyAccentColorToDataroomView ?? false,
       );
+      setLogoPosition("TOP_LEFT");
+      setCardLayout("LIST");
+      setRoundness("MEDIUM");
+      setSidebarEnabled(false);
+      setSidebarContent("");
+      setCtaLabel("");
+      setCtaUrl("");
       setIsLoading(false);
       toast.success("Branding reset successfully");
       router.reload();
     }
+  };
+
+  // Build preview iframe URL with all branding + layout params so the embedded
+  // demo page can render an accurate preview.
+  const buildPreviewQuery = () => {
+    const params = new URLSearchParams();
+    params.set("brandColor", debouncedBrandColor);
+    params.set("accentColor", debouncedAccentColor);
+    params.set(
+      "applyAccentColorToDataroomView",
+      applyAccentColorToDataroomView ? "1" : "0",
+    );
+    const logoSrc = blobUrl || logo || "";
+    if (logoSrc) params.set("brandLogo", logoSrc);
+    const secondaryLogoSrc = secondaryLogoBlobUrl || secondaryLogo || "";
+    if (secondaryLogoSrc) params.set("secondaryLogo", secondaryLogoSrc);
+    const bannerSrc =
+      banner === "no-banner"
+        ? "no-banner"
+        : bannerBlobUrl || banner || "";
+    if (bannerSrc) params.set("brandBanner", bannerSrc);
+    params.set("logoPosition", logoPosition);
+    params.set("cardLayout", cardLayout);
+    params.set("roundness", roundness);
+    params.set("sidebarEnabled", sidebarEnabled ? "1" : "0");
+    if (sidebarContent) params.set("sidebarContent", sidebarContent);
+    if (ctaLabel) params.set("ctaLabel", ctaLabel);
+    if (ctaUrl) params.set("ctaUrl", ctaUrl);
+    return params.toString();
   };
 
   return (
@@ -302,7 +460,52 @@ export default function DataroomBrandPage() {
           {/* Settings Column */}
           <div className="flex w-full flex-col gap-6 lg:w-[420px] lg:shrink-0">
             {/* Scrollable Settings */}
-            <div className="flex flex-col gap-6 lg:max-h-[calc(100vh-400px)] lg:overflow-y-auto lg:pr-4">
+            <Tabs defaultValue="branding" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="branding">Branding</TabsTrigger>
+                <TabsTrigger value="layouts">Layouts</TabsTrigger>
+              </TabsList>
+              <TabsContent
+                value="branding"
+                className="mt-4 flex flex-col gap-6 lg:max-h-[calc(100vh-440px)] lg:overflow-y-auto lg:pr-4"
+              >
+              {/* Auto-fill from website */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="space-y-3">
+                    <Label htmlFor="auto-fill-url">Auto-fill from website</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Paste a website URL and we&apos;ll pull logo, banner and
+                      colors via Brandfetch. You can still tweak everything
+                      below before saving.
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        id="auto-fill-url"
+                        type="text"
+                        placeholder="company.com"
+                        value={autoFillUrl}
+                        onChange={(e) => setAutoFillUrl(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAutoFill();
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleAutoFill}
+                        loading={autoFillLoading}
+                        disabled={!autoFillUrl.trim()}
+                      >
+                        Fetch
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Logo Card */}
               <Card>
                 <CardContent className="pt-6">
@@ -728,7 +931,248 @@ export default function DataroomBrandPage() {
                   </div>
                 </CardContent>
               </Card>
-            </div>
+              </TabsContent>
+
+              <TabsContent
+                value="layouts"
+                className="mt-4 flex flex-col gap-6 lg:max-h-[calc(100vh-440px)] lg:overflow-y-auto lg:pr-4"
+              >
+              {/* Logo Position Card */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="space-y-3">
+                    <Label>Logo Position</Label>
+                    <RadioGroup
+                      value={logoPosition}
+                      onValueChange={(v) =>
+                        setLogoPosition(v as DataroomLogoPosition)
+                      }
+                      className="grid grid-cols-3 gap-2"
+                    >
+                      {(
+                        [
+                          { v: "TOP_LEFT", label: "Top Left" },
+                          { v: "TOP_CENTER", label: "Top Center" },
+                          { v: "SPLIT", label: "Split (2 logos)" },
+                        ] as const
+                      ).map((opt) => (
+                        <Label
+                          key={opt.v}
+                          htmlFor={`logo-pos-${opt.v}`}
+                          className={cn(
+                            "flex cursor-pointer items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-xs",
+                            logoPosition === opt.v &&
+                              "border-black bg-gray-50",
+                          )}
+                        >
+                          <RadioGroupItem
+                            value={opt.v}
+                            id={`logo-pos-${opt.v}`}
+                          />
+                          {opt.label}
+                        </Label>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Secondary Logo Card — only shown when SPLIT layout is selected */}
+              {logoPosition === "SPLIT" && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="secondary-image">
+                        Secondary Logo{" "}
+                        <span className="font-normal text-muted-foreground">
+                          (max 2 MB)
+                        </span>
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Shown on the right side of the nav alongside the primary
+                        logo.
+                      </p>
+                      <label
+                        htmlFor="secondary-image"
+                        className="group relative mt-2 flex h-20 w-48 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 transition-all hover:border-gray-400 hover:bg-gray-100"
+                      >
+                        {!secondaryLogo ? (
+                          <UploadIcon
+                            className="h-8 w-8 text-gray-400"
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <div className="relative flex h-full w-full items-center justify-center p-4">
+                            <img
+                              src={secondaryLogo}
+                              alt="Secondary logo preview"
+                              className="max-h-full max-w-full object-contain"
+                            />
+                          </div>
+                        )}
+                      </label>
+                      <input
+                        id="secondary-image"
+                        name="secondary-image"
+                        type="file"
+                        accept="image/jpeg,image/png"
+                        className="sr-only"
+                        onChange={onChangeSecondaryLogo}
+                      />
+                      {secondaryLogo && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSecondaryLogo(null);
+                            setSecondaryLogoBlobUrl(null);
+                          }}
+                          className="text-xs"
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Card Layout */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="space-y-3">
+                    <Label>Document Card Layout</Label>
+                    <RadioGroup
+                      value={cardLayout}
+                      onValueChange={(v) =>
+                        setCardLayout(v as DataroomCardLayout)
+                      }
+                      className="grid grid-cols-3 gap-2"
+                    >
+                      {(
+                        [
+                          { v: "GRID", label: "Grid" },
+                          { v: "LIST", label: "List" },
+                          { v: "COMPACT", label: "Compact" },
+                        ] as const
+                      ).map((opt) => (
+                        <Label
+                          key={opt.v}
+                          htmlFor={`card-layout-${opt.v}`}
+                          className={cn(
+                            "flex cursor-pointer items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-xs",
+                            cardLayout === opt.v && "border-black bg-gray-50",
+                          )}
+                        >
+                          <RadioGroupItem
+                            value={opt.v}
+                            id={`card-layout-${opt.v}`}
+                          />
+                          {opt.label}
+                        </Label>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Roundness */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="space-y-3">
+                    <Label>Corner Roundness</Label>
+                    <RadioGroup
+                      value={roundness}
+                      onValueChange={(v) =>
+                        setRoundness(v as DataroomRoundness)
+                      }
+                      className="grid grid-cols-3 gap-2"
+                    >
+                      {(
+                        [
+                          { v: "NONE", label: "Sharp" },
+                          { v: "MEDIUM", label: "Medium" },
+                          { v: "LARGE", label: "Soft" },
+                        ] as const
+                      ).map((opt) => (
+                        <Label
+                          key={opt.v}
+                          htmlFor={`roundness-${opt.v}`}
+                          className={cn(
+                            "flex cursor-pointer items-center gap-2 border border-gray-200 px-3 py-2 text-xs",
+                            opt.v === "NONE" && "rounded-none",
+                            opt.v === "MEDIUM" && "rounded-md",
+                            opt.v === "LARGE" && "rounded-2xl",
+                            roundness === opt.v && "border-black bg-gray-50",
+                          )}
+                        >
+                          <RadioGroupItem
+                            value={opt.v}
+                            id={`roundness-${opt.v}`}
+                          />
+                          {opt.label}
+                        </Label>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Sidebar */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="sidebar-enabled">Left Sidebar</Label>
+                      <Switch
+                        id="sidebar-enabled"
+                        checked={sidebarEnabled}
+                        onCheckedChange={setSidebarEnabled}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Show a left-side panel inside the data room with custom
+                      info (deal overview, contact, instructions). The CTA below
+                      will appear in the sidebar when this is on.
+                    </p>
+                    {sidebarEnabled && (
+                      <Textarea
+                        id="sidebar-content"
+                        value={sidebarContent}
+                        onChange={(e) => setSidebarContent(e.target.value)}
+                        placeholder="Welcome to the data room. Reach out to deals@example.com with any questions."
+                        className="min-h-32"
+                      />
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* CTA */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="space-y-3">
+                    <Label>Call to Action</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Renders {sidebarEnabled ? "in the sidebar" : "in the nav"}{" "}
+                      based on the selected layout.
+                    </p>
+                    <Input
+                      placeholder="Button label (e.g. Book a meeting)"
+                      value={ctaLabel}
+                      onChange={(e) => setCtaLabel(e.target.value)}
+                    />
+                    <Input
+                      placeholder="https://..."
+                      value={ctaUrl}
+                      onChange={(e) => setCtaUrl(e.target.value)}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+              </TabsContent>
+            </Tabs>
 
             {/* Action Buttons - Always Visible */}
             <div className="flex items-center gap-4 border-t bg-background pt-4">
@@ -814,10 +1258,10 @@ export default function DataroomBrandPage() {
                       <div className="relative min-h-0 flex-1 overflow-x-auto">
                         <div className="relative h-full max-w-[1396px]">
                           <iframe
-                            key={`dataroom-view-${debouncedBrandColor}-${debouncedAccentColor}-${banner}`}
+                            key={`dataroom-view-${debouncedBrandColor}-${debouncedAccentColor}-${banner}-${logoPosition}-${cardLayout}-${roundness}-${sidebarEnabled}-${secondaryLogo ?? ""}-${ctaLabel}`}
                             name="dataroom-view"
                             id="dataroom-view"
-                            src={`/room_ppreview_demo?brandColor=${encodeURIComponent(debouncedBrandColor)}&accentColor=${encodeURIComponent(debouncedAccentColor)}&applyAccentColorToDataroomView=${applyAccentColorToDataroomView ? "1" : "0"}&brandLogo=${blobUrl ? encodeURIComponent(blobUrl) : logo ? encodeURIComponent(logo) : ""}&brandBanner=${banner === "no-banner" ? encodeURIComponent("no-banner") : bannerBlobUrl ? encodeURIComponent(bannerBlobUrl) : banner ? encodeURIComponent(banner) : ""}`}
+                            src={`/room_ppreview_demo?${buildPreviewQuery()}`}
                             className="absolute left-0 top-0 h-full w-full origin-top-left scale-50 overflow-hidden rounded-b-lg border-0 bg-white"
                             style={{
                               width: "200%",

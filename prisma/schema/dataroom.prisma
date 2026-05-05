@@ -120,16 +120,45 @@ model DataroomFolder {
 model DataroomBrand {
   id                             String   @id @default(cuid())
   logo                           String? // This should be a reference to where the file is stored (S3, Google Cloud Storage, etc.)
+  secondaryLogo                  String? // Optional second logo (e.g., partner / co-branded logo)
   banner                         String? // This should be a reference to where the file is stored (S3, Google Cloud Storage, etc.)
   brandColor                     String? // This should be a reference to the brand color
   accentColor                    String? // This should be a reference to the accent color
   applyAccentColorToDataroomView Boolean  @default(false) // When true, apply accentColor to dataroom list/tree viewer background
   welcomeMessage                 String? // This should be a reference to the welcome message
-  dataroomId                     String   @unique
-  dataroom                       Dataroom @relation(fields: [dataroomId], references: [id], onDelete: Cascade)
+
+  // Layout customization
+  logoPosition  DataroomLogoPosition @default(TOP_LEFT)
+  cardLayout    DataroomCardLayout   @default(LIST)
+  roundness     DataroomRoundness    @default(MEDIUM)
+  sidebarEnabled Boolean             @default(false)
+  sidebarContent String?             // Rich text / markdown shown in the left sidebar
+  ctaLabel      String?
+  ctaUrl        String?
+
+  dataroomId String   @unique
+  dataroom   Dataroom @relation(fields: [dataroomId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+enum DataroomLogoPosition {
+  TOP_LEFT
+  TOP_CENTER
+  SPLIT // primary logo left, secondary logo right
+}
+
+enum DataroomCardLayout {
+  GRID
+  LIST
+  COMPACT
+}
+
+enum DataroomRoundness {
+  NONE
+  MEDIUM
+  LARGE
 }
 
 model ViewerGroup {

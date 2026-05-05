@@ -1,5 +1,13 @@
 import { useRouter } from "next/router";
 
+import type { CSSProperties } from "react";
+
+import {
+  DataroomCardLayout,
+  DataroomLogoPosition,
+  DataroomRoundness,
+} from "@prisma/client";
+
 import { ViewFolderTree } from "@/components/datarooms/folders";
 import DocumentCard from "@/components/view/dataroom/document-card";
 import FolderCard from "@/components/view/dataroom/folder-card";
@@ -14,58 +22,125 @@ export default function ViewPage() {
   const router = useRouter();
   const {
     brandLogo,
+    secondaryLogo,
     brandColor,
     brandBanner,
     accentColor,
     applyAccentColorToDataroomView,
+    logoPosition: logoPositionParam,
+    cardLayout: cardLayoutParam,
+    roundness: roundnessParam,
+    sidebarEnabled: sidebarEnabledParam,
+    sidebarContent,
+    ctaLabel,
+    ctaUrl,
   } = router.query as {
-    brandLogo: string;
-    brandColor: string;
-    brandBanner: string;
-    accentColor: string;
+    brandLogo?: string;
+    secondaryLogo?: string;
+    brandColor?: string;
+    brandBanner?: string;
+    accentColor?: string;
     applyAccentColorToDataroomView?: string;
+    logoPosition?: string;
+    cardLayout?: string;
+    roundness?: string;
+    sidebarEnabled?: string;
+    sidebarContent?: string;
+    ctaLabel?: string;
+    ctaUrl?: string;
   };
+
+  const logoPosition: DataroomLogoPosition =
+    logoPositionParam === "TOP_CENTER" || logoPositionParam === "SPLIT"
+      ? logoPositionParam
+      : "TOP_LEFT";
+  const cardLayout: DataroomCardLayout =
+    cardLayoutParam === "GRID" || cardLayoutParam === "COMPACT"
+      ? cardLayoutParam
+      : "LIST";
+  const roundness: DataroomRoundness =
+    roundnessParam === "NONE" || roundnessParam === "LARGE"
+      ? roundnessParam
+      : "MEDIUM";
+  const sidebarEnabled = sidebarEnabledParam === "1";
+  const showSidebarCta = sidebarEnabled && !!ctaLabel && !!ctaUrl;
+  const showNavCta = !sidebarEnabled && !!ctaLabel && !!ctaUrl;
+
+  const radiusValue =
+    roundness === "NONE" ? "0px" : roundness === "LARGE" ? "16px" : "8px";
 
   const shouldApplyAccentToDataroomView =
     applyAccentColorToDataroomView === "1";
   const dataroomViewBackgroundColor = shouldApplyAccentToDataroomView
     ? accentColor
     : "#ffffff";
-  const previewSurfaceTheme = createViewerSurfaceTheme(dataroomViewBackgroundColor);
+  const previewSurfaceTheme = createViewerSurfaceTheme(
+    dataroomViewBackgroundColor,
+  );
+
+  const itemListClassName =
+    cardLayout === "GRID"
+      ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+      : cardLayout === "COMPACT"
+        ? "space-y-2"
+        : "space-y-4";
+
+  const renderPrimaryLogo = () =>
+    brandLogo ? (
+      <img className="w-full object-contain" src={brandLogo} alt="Logo" />
+    ) : (
+      <div className="text-2xl font-bold tracking-tighter text-white">
+        Papermark
+      </div>
+    );
 
   return (
     <div
       className="min-h-screen bg-white"
       style={
-        dataroomViewBackgroundColor
-          ? { backgroundColor: dataroomViewBackgroundColor }
-          : undefined
+        {
+          backgroundColor: dataroomViewBackgroundColor,
+          "--viewer-radius": radiusValue,
+        } as CSSProperties
       }
     >
       {/* Nav */}
       <nav
         className="bg-black"
-        style={{
-          backgroundColor: brandColor,
-        }}
+        style={{ backgroundColor: brandColor }}
       >
         <div className="mx-auto px-2 sm:px-6 lg:px-8">
           <div className="relative flex h-16 items-center justify-between">
-            <div className="flex flex-1 items-center justify-start">
+            <div
+              className={
+                logoPosition === "TOP_CENTER"
+                  ? "flex flex-1 items-center justify-center"
+                  : "flex flex-1 items-center justify-start"
+              }
+            >
               <div className="relative flex h-16 w-36 flex-shrink-0 items-center overflow-y-hidden">
-                {brandLogo ? (
+                {renderPrimaryLogo()}
+              </div>
+              {logoPosition === "SPLIT" && secondaryLogo && (
+                <div className="ml-auto flex h-16 w-36 flex-shrink-0 items-center justify-end overflow-y-hidden">
                   <img
                     className="w-full object-contain"
-                    src={brandLogo}
-                    alt="Logo"
+                    src={secondaryLogo}
+                    alt="Secondary logo"
                   />
-                ) : (
-                  <div className="text-2xl font-bold tracking-tighter text-white">
-                    Papermark
-                  </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
+            {showNavCta && (
+              <a
+                href={ctaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-4 inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-black"
+              >
+                {ctaLabel}
+              </a>
+            )}
           </div>
         </div>
 
@@ -91,12 +166,53 @@ export default function ViewPage() {
 
       {/* Body */}
       <ViewerSurfaceThemeProvider value={previewSurfaceTheme}>
-        <div style={{ height: "calc(100vh - 64px)" }} className="relative flex">
-          {/* Tree view */}
+        <div
+          style={
+            {
+              height: "calc(100vh - 64px)",
+              "--viewer-radius": radiusValue,
+            } as CSSProperties
+          }
+          className="relative flex"
+        >
+          {/* Left column: optional sidebar + folder tree */}
           <div
             className="hidden h-full shrink-0 overflow-y-auto overflow-x-hidden px-3 pb-4 pt-4 md:block md:px-4 md:pt-6 lg:px-6 lg:pt-9 xl:px-8"
             style={{ width: "clamp(260px, 28vw, 440px)" }}
           >
+            {sidebarEnabled && (sidebarContent || showSidebarCta) && (
+              <div
+                className="mb-6 border border-[var(--viewer-panel-border)] bg-[var(--viewer-panel-bg)] p-4"
+                style={{
+                  borderRadius: "var(--viewer-radius)",
+                  borderColor: previewSurfaceTheme.palette.panelBorderColor,
+                  backgroundColor: previewSurfaceTheme.palette.panelBgColor,
+                }}
+              >
+                {sidebarContent && (
+                  <p
+                    className="whitespace-pre-wrap text-sm"
+                    style={{ color: previewSurfaceTheme.palette.textColor }}
+                  >
+                    {sidebarContent}
+                  </p>
+                )}
+                {showSidebarCta && (
+                  <a
+                    href={ctaUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-flex w-full items-center justify-center px-4 py-2 text-sm font-medium text-white"
+                    style={{
+                      backgroundColor: brandColor || "#000000",
+                      borderRadius: "var(--viewer-radius)",
+                    }}
+                  >
+                    {ctaLabel}
+                  </a>
+                )}
+              </div>
+            )}
             <ViewFolderTree
               folders={[
                 {
@@ -154,8 +270,10 @@ export default function ViewPage() {
               <div className="space-y-4">
                 <div
                   className={`text-sm ${previewSurfaceTheme.usesLightText ? "text-white/70" : "text-muted-foreground"}`}
-                >Home</div>
-                <ul className="grid gap-4">
+                >
+                  Home
+                </div>
+                <ul className={itemListClassName}>
                   <li key="1">
                     <FolderCard
                       folder={{
@@ -176,6 +294,7 @@ export default function ViewPage() {
                       isPreview={false}
                       linkId="1"
                       allowDownload={false}
+                      layout={cardLayout}
                     />
                   </li>
 
@@ -199,6 +318,7 @@ export default function ViewPage() {
                       isPreview={false}
                       linkId="1"
                       allowDownload={false}
+                      layout={cardLayout}
                     />
                   </li>
 
@@ -225,6 +345,7 @@ export default function ViewPage() {
                       linkId="1"
                       isPreview={false}
                       allowDownload={false}
+                      layout={cardLayout}
                     />
                   </li>
                 </ul>

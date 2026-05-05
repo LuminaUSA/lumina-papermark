@@ -11,7 +11,9 @@ import {
 import { ViewerChatToggle } from "@/ee/features/ai/components/viewer-chat-toggle";
 import {
   DataroomBrand,
+  DataroomCardLayout,
   DataroomFolder,
+  DataroomRoundness,
   PermissionGroupAccessControls,
   ViewerGroupAccessControls,
 } from "@prisma/client";
@@ -417,6 +419,7 @@ export default function DataroomViewer({
           isProcessing={isProcessing}
           dataroomIndexEnabled={dataroomIndexEnabled}
           showLastUpdated={dataroom?.showLastUpdated ?? true}
+          layout={cardLayout}
         />
       );
     }
@@ -433,6 +436,7 @@ export default function DataroomViewer({
         allowDownload={item.allowDownload}
         dataroomIndexEnabled={dataroomIndexEnabled}
         showLastUpdated={dataroom?.showLastUpdated ?? true}
+        layout={cardLayout}
       />
     );
   };
@@ -445,6 +449,27 @@ export default function DataroomViewer({
           : "#ffffff",
       ),
     [brand],
+  );
+
+  const cardLayout: DataroomCardLayout =
+    (brand as any)?.cardLayout ?? "LIST";
+  const roundness: DataroomRoundness = (brand as any)?.roundness ?? "MEDIUM";
+  const sidebarEnabled = !!(brand as any)?.sidebarEnabled;
+  const sidebarContent: string | null = (brand as any)?.sidebarContent ?? null;
+  const ctaLabel: string | null = (brand as any)?.ctaLabel ?? null;
+  const ctaUrl: string | null = (brand as any)?.ctaUrl ?? null;
+  const showSidebarCta = sidebarEnabled && !!ctaLabel && !!ctaUrl;
+
+  const radiusValue =
+    roundness === "NONE" ? "0px" : roundness === "LARGE" ? "16px" : "8px";
+
+  const itemListClassName = cn(
+    "-mx-4 overflow-auto p-4",
+    cardLayout === "GRID"
+      ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+      : cardLayout === "COMPACT"
+        ? "space-y-2"
+        : "space-y-4",
   );
   const mobileTreeTheme = useMemo(
     () => ({
@@ -523,19 +548,45 @@ export default function DataroomViewer({
                     viewerSurfaceTheme.palette.controlIconColor,
                   "--viewer-placeholder":
                     viewerSurfaceTheme.palette.controlPlaceholderColor,
+                  "--viewer-radius": radiusValue,
                 } as React.CSSProperties
               }
             >
-            {/* Tree view */}
+            {/* Left column: optional info sidebar + folder tree */}
             <div
               className="hidden h-full shrink-0 overflow-y-auto overflow-x-hidden px-3 pb-4 pt-4 md:block md:px-4 md:pt-6 lg:px-6 lg:pt-9 xl:px-8"
               style={{
-                // Fluid sidebar: grows with viewport but clamped to sensible
-                // bounds so the tree fills available space without feeling
-                // cramped on narrow screens or stretched on ultra-wide ones.
                 width: "clamp(260px, 28vw, 440px)",
               }}
             >
+              {sidebarEnabled && (sidebarContent || showSidebarCta) && (
+                <div
+                  className="mb-6 border border-[var(--viewer-panel-border)] bg-[var(--viewer-panel-bg)] p-4"
+                  style={{ borderRadius: "var(--viewer-radius)" }}
+                >
+                  {sidebarContent && (
+                    <p className="whitespace-pre-wrap text-sm text-[var(--viewer-text)]">
+                      {sidebarContent}
+                    </p>
+                  )}
+                  {showSidebarCta && (
+                    <a
+                      href={ctaUrl!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        "mt-4 inline-flex w-full items-center justify-center px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90",
+                      )}
+                      style={{
+                        backgroundColor: brand?.brandColor || "#000000",
+                        borderRadius: "var(--viewer-radius)",
+                      }}
+                    >
+                      {ctaLabel}
+                    </a>
+                  )}
+                </div>
+              )}
               <ViewFolderTree
                 folders={folders}
                 documents={documents}
@@ -720,10 +771,7 @@ export default function DataroomViewer({
 
                 {activeTab === "my-uploads" ? (
                   /* My Uploads tab - show all uploads across all folders */
-                  <ul
-                    role="list"
-                    className="-mx-4 space-y-4 overflow-auto p-4"
-                  >
+                  <ul role="list" className="-mx-4 space-y-4 overflow-auto p-4">
                     {allUploads.length === 0 ? (
                       <li className="py-6 text-center text-[var(--viewer-subtle-text)]">
                         No uploads yet. Upload documents using the &quot;Add
@@ -748,10 +796,7 @@ export default function DataroomViewer({
                   </ul>
                 ) : (
                   /* Documents tab - normal folder view */
-                  <ul
-                    role="list"
-                    className="-mx-4 space-y-4 overflow-auto p-4"
-                  >
+                  <ul role="list" className={itemListClassName}>
                     {!searchQuery &&
                       filteredPendingUploads.map((pendingUpload) => (
                         <li key={pendingUpload.id}>

@@ -298,11 +298,19 @@ export async function fetchDataroomLinkData({
     where: { dataroomId: linkData.dataroom.id },
     select: {
       logo: true,
+      secondaryLogo: true,
       banner: true,
       brandColor: true,
       accentColor: true,
       applyAccentColorToDataroomView: true,
       welcomeMessage: true,
+      logoPosition: true,
+      cardLayout: true,
+      roundness: true,
+      sidebarEnabled: true,
+      sidebarContent: true,
+      ctaLabel: true,
+      ctaUrl: true,
     },
   });
 
@@ -320,6 +328,7 @@ export async function fetchDataroomLinkData({
 
   const brand = {
     logo: dataroomBrand?.logo || teamBrand?.logo,
+    secondaryLogo: dataroomBrand?.secondaryLogo ?? null,
     banner: dataroomBrand?.banner || teamBrand?.banner || null,
     brandColor: dataroomBrand?.brandColor || teamBrand?.brandColor,
     accentColor: dataroomBrand?.accentColor || teamBrand?.accentColor,
@@ -328,6 +337,13 @@ export async function fetchDataroomLinkData({
       teamBrand?.applyAccentColorToDataroomView ??
       false,
     welcomeMessage: dataroomBrand?.welcomeMessage || teamBrand?.welcomeMessage,
+    logoPosition: dataroomBrand?.logoPosition,
+    cardLayout: dataroomBrand?.cardLayout,
+    roundness: dataroomBrand?.roundness,
+    sidebarEnabled: dataroomBrand?.sidebarEnabled ?? false,
+    sidebarContent: dataroomBrand?.sidebarContent ?? null,
+    ctaLabel: dataroomBrand?.ctaLabel ?? null,
+    ctaUrl: dataroomBrand?.ctaUrl ?? null,
   };
 
   // Extract access controls from either ViewerGroup or PermissionGroup
@@ -445,11 +461,19 @@ export async function fetchDataroomDocumentLinkData({
     where: { dataroomId: linkData.dataroom.id },
     select: {
       logo: true,
+      secondaryLogo: true,
       banner: true,
       brandColor: true,
       accentColor: true,
       applyAccentColorToDataroomView: true,
       welcomeMessage: true,
+      logoPosition: true,
+      cardLayout: true,
+      roundness: true,
+      sidebarEnabled: true,
+      sidebarContent: true,
+      ctaLabel: true,
+      ctaUrl: true,
     },
   });
 
@@ -467,6 +491,7 @@ export async function fetchDataroomDocumentLinkData({
 
   const brand = {
     logo: dataroomBrand?.logo || teamBrand?.logo,
+    secondaryLogo: dataroomBrand?.secondaryLogo ?? null,
     banner: dataroomBrand?.banner || teamBrand?.banner || null,
     brandColor: dataroomBrand?.brandColor || teamBrand?.brandColor,
     accentColor: dataroomBrand?.accentColor || teamBrand?.accentColor,
@@ -475,6 +500,13 @@ export async function fetchDataroomDocumentLinkData({
       teamBrand?.applyAccentColorToDataroomView ??
       false,
     welcomeMessage: dataroomBrand?.welcomeMessage || teamBrand?.welcomeMessage,
+    logoPosition: dataroomBrand?.logoPosition,
+    cardLayout: dataroomBrand?.cardLayout,
+    roundness: dataroomBrand?.roundness,
+    sidebarEnabled: dataroomBrand?.sidebarEnabled ?? false,
+    sidebarContent: dataroomBrand?.sidebarContent ?? null,
+    ctaLabel: dataroomBrand?.ctaLabel ?? null,
+    ctaUrl: dataroomBrand?.ctaUrl ?? null,
   };
 
   return { linkData, brand };
